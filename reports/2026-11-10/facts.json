@@ -1,0 +1,49 @@
+{
+  "as_of": "2026-11-10",
+  "orders": [
+    {
+      "order": "PO-2330",
+      "style": "Polo-Shirt-Black",
+      "order_qty": 6000,
+      "ship_date": "2026-11-15",
+      "sewing_deadline": "2026-11-14",
+      "ship_risk": "🚨 VERY HIGH",
+      "projected_ready": 4713,
+      "shortfall": 1287,
+      "produced": 2681,
+      "needed_per_day": 730,
+      "current_per_day": 606,
+      "efficiency_pct": 74.4,
+      "main_loss_reasons_pieces": {
+        "absenteeism": 178,
+        "slow_speed_other": 286,
+        "downtime_Machine breakdown": 64,
+        "downtime_Waiting for trims": 64,
+        "downtime_Power cut": 34
+      },
+      "quality": {
+        "status": "GREEN",
+        "recent_dhu": 2.69,
+        "target_dhu": 3.0,
+        "expected_defects_in_remaining": 89
+      },
+      "material_problems": [
+        {
+          "item": "Buttons 4-hole black",
+          "supplier": "Dhaka Trims",
+          "status": "LATE",
+          "balance": 2700,
+          "unit": "pcs",
+          "note": "ETA 2026-11-12 is 1 day(s) AFTER it is needed (2026-11-11); also 2 day(s) past promised date"
+        }
+      ],
+      "pieces_lost_waiting_material": 187,
+      "options_remaining_shortfall": {
+        "2h_overtime_per_day": 833,
+        "work_friday": 681,
+        "friday_plus_2h_overtime": 75,
+        "friday_plus_3h_overtime": 0
+      }
+    }
+  ]
+}

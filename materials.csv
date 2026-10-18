@@ -1,0 +1,5 @@
+order_id,item,stage,supplier,qty_ordered,qty_received,per_piece,unit,promised_date,latest_eta,needed_by
+PO-2330,Black pique fabric,sewing,Rahim Textiles,1800,1800,0.3,kg,2026-11-03,,2026-11-05
+PO-2330,Buttons 4-hole black,sewing,Dhaka Trims,6200,3500,1,pcs,2026-11-08,2026-11-12,2026-11-11
+PO-2330,Neck label + hangtag,sewing,Label House,6000,6000,1,pcs,2026-11-06,,2026-11-10
+PO-2330,Polybag + carton,packing,Pack Ltd,6000,0,1,pcs,2026-11-12,2026-11-12,2026-11-14

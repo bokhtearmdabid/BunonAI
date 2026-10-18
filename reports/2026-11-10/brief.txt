@@ -1,0 +1,13 @@
+PO-2330 (Polo-Shirt-Black) এর ship risk 🚨 VERY HIGH, sewing deadline 2026-11-14 এর মধ্যে projected shortfall 1287 pcs।
+
+লসের মূল কারণ:
+- Production: Current 606 pcs/day চলছে (needed 730 pcs/day); slow speed-এ প্রায় 286 pcs এবং absenteeism-এ প্রায় 178 pcs লস হয়েছে।
+- Material: Supplier Dhaka Trims থেকে Buttons 4-hole black late (balance 2700 pcs), ETA 2026-11-12 যা needed date 2026-11-11 এর পরে।
+- Quality: Status GREEN, recent DHU 2.69 (target 3.0)।
+
+TOP 3 ACTIONS for today:
+1. Daily 2h overtime: shortfall কমে 833 pcs হবে, trade-off হলো overtime cost বাড়বে।
+2. Work Friday: shortfall কমে 681 pcs হবে, trade-off হলো off-day work allowance ও worker fatigue।
+3. Friday plus 3h overtime: shortfall 0 pcs হবে, trade-off হলো high overtime cost ও severe fatigue।
+
+Shortfall মেটাতে আপনি কি Friday work নাকি Friday plus overtime অপশন approve করবেন?
