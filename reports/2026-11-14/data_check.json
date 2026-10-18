@@ -1,0 +1,20 @@
+{
+  "status": "BLOCKED",
+  "folder": "2026-11-14",
+  "rows": 100,
+  "removed": 0,
+  "issues": [
+    {
+      "level": "BLOCK",
+      "msg": "No data since 2026-11-10: 3 working day(s) missing (11 Nov, 12 Nov, 14 Nov).",
+      "fix": "Enter the missing days. Until then any forecast would be out of date.",
+      "rows": []
+    },
+    {
+      "level": "WARN",
+      "msg": "On 2026-11-10 these lines have not reported: Line-2, Line-3.",
+      "fix": "Wait for them, or enter their numbers. The agents estimate them meanwhile.",
+      "rows": []
+    }
+  ]
+}

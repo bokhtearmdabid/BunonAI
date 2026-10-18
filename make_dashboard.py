@@ -1,105 +1,840 @@
 """BunonAI - Make Deshboard"""
-import json
-import sys
-from datetime import datetime
+import json, sys
 from pathlib import Path
-
 import pandas as pd
+from datetime import datetime
 
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATE_PATH = BASE_DIR / "dashboard_template.html"
-REPORTS_DIR = Path("reports")
-DATASET_PATH = Path("BunonAI_daily_production_dataset.csv")
-OUTPUT_PATH = Path("dashboard.html")
-PLACEHOLDER = "__DATA__"
+TEMPLATE = r"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BunonAI – Factory Dashboard</title>
+
+<style>
+/* COLOURS & THEME */
+:root {
+  --bg: #f3f5fa;
+  --card: #ffffff;
+  --text: #161b26;
+  --muted: #667085;
+  --line: #e6e9f0;
+
+  --red: #e5484d;
+  --amber: #f59e0b;
+  --green: #12b76a;
+  --blue: #4f7cff;
+  --teal: #14b8c4;
+  --violet: #8b5cf6;
+
+  --redbg: #fff1f1;
+  --ambbg: #fff8e6;
+  --grnbg: #e9f9f0;
+
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.06);
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Dark mode (follows the phone/computer setting) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1017;  --card: #161b25;  --text: #eef1f6;  --muted: #9aa4b5;  --line: #262d3a;
+    --redbg: #2b1416;  --ambbg: #2a2111;  --grnbg: #0f2519;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+/* Dark mode forced by data-theme="dark" */
+:root[data-theme="dark"] {
+  --bg: #0d1017;  --card: #161b25;  --text: #eef1f6;  --muted: #9aa4b5;  --line: #262d3a;
+  --redbg: #2b1416;  --ambbg: #2a2111;  --grnbg: #0f2519;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+/* PAGE BASICS */
+* { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 16px; }
+
+/* TOP BAR */
+.top {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.logo { font-weight: 800; font-size: 18px; letter-spacing: -.2px; }
+.logo span { color: var(--blue); }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill {
+  display: inline-flex; gap: 6px; align-items: center;
+  padding: 4px 12px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--line);
+  font-size: 12px; color: var(--muted);
+}
+
+/* WELCOME BANNER */
+.welcome {
+  background: linear-gradient(135deg, #1e3a8a, #4f7cff 60%, #14b8c4);
+  color: #fff; border-radius: 18px; padding: 22px; box-shadow: var(--shadow);
+}
+.welcome h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -.3px; }
+.welcome p  { margin: 4px 0; opacity: .95; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.chips span {
+  background: rgba(255,255,255,.18); border-radius: 999px;
+  padding: 3px 12px; font-size: 12px;
+}
+
+/* HEADINGS, CARDS, GRIDS */
+h2 { font-size: 15px; margin: 0 0 2px; }
+.sec {                                   /* section title above each order */
+  font-size: 13px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .8px; margin: 26px 0 8px; font-weight: 700;
+}
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px; box-shadow: var(--shadow);
+}
+.g2   { display: grid; gap: 12px; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); }
+.kpis { display: grid; gap: 12px; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+/* KPI NUMBERS */
+.kpi .ic { font-size: 20px; }
+.big { font-size: 28px; font-weight: 800; letter-spacing: -.5px; line-height: 1.15; }
+.lbl { color: var(--muted); font-size: 12px; }
+.sub { color: var(--muted); font-size: 12.5px; }
+
+/* RISK BOX (red / amber / green) */
+.red   { --c: var(--red);   --b: var(--redbg); }
+.amber { --c: var(--amber); --b: var(--ambbg); }
+.green { --c: var(--green); --b: var(--grnbg); }
+
+.hero {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap; margin-top: 12px;
+  border-left: 7px solid var(--c); background: var(--b);
+}
+.hero .big { color: var(--c); }
+
+.tip {                                   /* the 💡 line under each chart */
+  margin-top: 10px; padding: 8px 10px; border-radius: 10px;
+  background: var(--bg); font-size: 13px;
+}
+
+/* HORIZONTAL BAR ROWS */
+.row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 13px; }
+.row .n { width: 38%; min-width: 96px; }
+.row .t { flex: 1; background: var(--line); border-radius: 8px; height: 12px; overflow: hidden; }
+.row .t i { display: block; height: 100%; border-radius: 8px; }
+.row .v { width: 58px; text-align: right; font-weight: 600; }
+
+/* DONUT + LEGEND */
+.donut { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.dl div { font-size: 13px; margin: 5px 0; }
+.dl b, .leg b { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+.leg span { display: inline-block; margin-right: 12px; font-size: 12px; color: var(--muted); }
+
+/* ACTION LIST */
+.acts { list-style: none; margin: 8px 0 0; padding: 0; }
+.acts li {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px; border-radius: 12px; background: var(--bg);
+  margin-bottom: 8px; font-size: 14px;
+}
+.acts li .num {
+  flex: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--blue); color: #fff;
+  display: grid; place-items: center; font-size: 12px;
+}
+
+/* TABLES & TAGS */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+
+.tag { padding: 2px 10px; border-radius: 999px; font-size: 12px; color: #fff; }
+.tag.green { background: var(--green); }
+.tag.amber { background: var(--amber); }
+.tag.red   { background: var(--red); }
+
+/* DATA HEALTH ITEMS */
+.dqi {
+  display: flex; gap: 10px; padding: 10px; border-radius: 12px;
+  background: var(--bg); margin-top: 8px; font-size: 13px;
+}
+.dqi .tag { flex: none; height: fit-content; }
+
+/* WHATSAPP MESSAGE + FOOTER */
+pre { white-space: pre-wrap; font: inherit; margin: 8px 0 0; }
+footer {
+  margin: 30px 0 8px; padding-top: 16px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 12.5px; text-align: center;
+}
+footer strong { color: var(--text); }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <!-- Top bar -->
+  <div class="top">
+    <div class="logo">Bunon<span>AI</span></div>
+    <div class="pills">
+      <div class="pill" id="dqpill"></div>
+      <div class="pill" id="asof"></div>
+    </div>
+  </div>
+
+  <!-- Everything else is drawn here by the script below -->
+  <div id="app"></div>
+
+  <footer>
+    <div><strong>BunonAI</strong> · Virtual operations manager for garment factories</div>
+    <div>Agents: Production · Quality · Supplier · Export Deadline</div>
+    <div id="gen"></div>
+    <div style="margin-top:6px">
+      Numbers are calculated by code. AI only helps write the language.
+      Loss reasons are estimates. Current data is sample data.
+    </div>
+    <div style="margin-top:6px">
+    © 2026 Bokhtear Md. Abid. All rights reserved.
+    </div>
+  </footer>
+</div>
+
+<script>
+/* =====================================================================
+   A. DATA (injected by Python)
+   ===================================================================== */
+const D = __DATA__;
+const TOTAL_LINES = D.total_lines;      // how many sewing lines the factory has
 
 
-def _json_default(value):
-    """Convert numpy/pandas scalars to plain Python values for JSON."""
-    return value.item() if hasattr(value, "item") else str(value)
+/* =====================================================================
+   B. SMALL HELPERS
+   ===================================================================== */
+
+// Make text safe to put inside HTML
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"
+}[ch]));
+
+// 12345 -> "12,345"
+const fmt = n => Number(n).toLocaleString("en-US");
+
+// Turn the risk text into [css-class, label, emoji]
+function riskInfo(text) {
+  if (text.includes("LOW"))    return ["green", "LOW",       "🟢"];
+  if (text.includes("MEDIUM")) return ["amber", "MEDIUM",    "🟡"];
+  if (text.includes("VERY"))   return ["red",   "VERY HIGH", "🚨"];
+  return                              ["red",   "HIGH",      "🔴"];
+}
+
+// "downtime_power_cut" -> "Downtime: power cut"
+function niceName(key) {
+  return key
+    .replace("downtime_", "Downtime: ")
+    .replace(/_/g, " ")
+    .replace(/^./, c => c.toUpperCase());
+}
+
+// Colour of an efficiency bar: <70 red, <85 amber, else green
+const effColor = v => v < 70 ? "var(--red)" : v < 85 ? "var(--amber)" : "var(--green)";
+
+const PALETTE = ["#4f7cff", "#8b5cf6", "#14b8c4", "#f59e0b", "#e5484d", "#12b76a"];
+
+const hour = new Date().getHours();
+const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
 
-def load_reports() -> tuple[list[dict], list[Path]]:
-    """Load every facts.json (oldest to newest) and return it with the file paths."""
-    runs = sorted(REPORTS_DIR.glob("*/facts.json"))
+/* =====================================================================
+   C. CHART DRAWING (small hand-made SVG charts, no libraries)
+   ===================================================================== */
+
+/* ---- Donut chart ------------------------------------------------------
+   parts = [{ l: "label", v: number, c: "colour" }, ...]
+   big / small = text in the middle of the ring                          */
+function donut(parts, big, small) {
+  const R = 54;
+  const circumference = 2 * Math.PI * R;
+  const total = parts.reduce((sum, p) => sum + p.v, 0) || 1;
+
+  let offset = 0;
+  const arcs = parts.map(p => {
+    const len = p.v / total * circumference;
+    const svg = `<circle r="${R}" cx="70" cy="70" fill="none" style="stroke:${p.c}"
+        stroke-width="22" stroke-dasharray="${len} ${circumference - len}"
+        stroke-dashoffset="${-offset}" transform="rotate(-90 70 70)"/>`;
+    offset += len;
+    return svg;
+  }).join("");
+
+  const legend = parts.map(p =>
+    `<div><b style="background:${p.c}"></b>${esc(p.l)}: <strong>${fmt(p.v)}</strong></div>`
+  ).join("");
+
+  return `
+    <div class="donut">
+      <svg viewBox="0 0 140 140" width="150" height="150" role="img">
+        <circle r="${R}" cx="70" cy="70" fill="none" style="stroke:var(--line)" stroke-width="22"/>
+        ${arcs}
+        <text x="70" y="68" text-anchor="middle" font-size="22" font-weight="700" style="fill:var(--text)">${big}</text>
+        <text x="70" y="85" text-anchor="middle" font-size="10" style="fill:var(--muted)">${small}</text>
+      </svg>
+      <div class="dl">${legend}</div>
+    </div>`;
+}
+
+/* ---- Line chart -------------------------------------------------------
+   points = [{ x: "label", y: number }, ...]
+   opts   = { c: colour, ref: dotted line value, rl: dotted line label,
+              min, max, f: number formatter }                            */
+function lineChart(points, opts) {
+  const W = 420, H = 190;
+  const pad = { l: 38, r: 12, t: 14, b: 26 };
+  const innerW = W - pad.l - pad.r;
+  const innerH = H - pad.t - pad.b;
+
+  const yMax = opts.max ?? (Math.max(...points.map(p => p.y), opts.ref || 0) * 1.15 || 1);
+  const yMin = opts.min ?? 0;
+
+  const X = i => pad.l + (points.length > 1 ? i * innerW / (points.length - 1) : innerW / 2);
+  const Y = v => pad.t + innerH - innerH * (v - yMin) / (yMax - yMin || 1);
+
+  let svg = "";
+
+  // grid lines + left-side numbers
+  for (let i = 0; i <= 3; i++) {
+    const v = yMin + (yMax - yMin) * i / 3;
+    const label = opts.f ? opts.f(v) : Math.round(v);
+    svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--line)"/>
+            <text x="${pad.l - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="10" style="fill:var(--muted)">${label}</text>`;
+  }
+
+  // dotted reference line (e.g. "plan" or "target")
+  if (opts.ref != null) {
+    svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${Y(opts.ref)}" y2="${Y(opts.ref)}"
+                  stroke-dasharray="5 4" style="stroke:var(--amber)"/>
+            <text x="${W - pad.r}" y="${Y(opts.ref) - 4}" text-anchor="end" font-size="10"
+                  style="fill:var(--amber)">${opts.rl}</text>`;
+  }
+
+  // the line itself
+  const path = points.map((p, i) => (i ? "L" : "M") + X(i) + "," + Y(p.y)).join(" ");
+  svg += `<path d="${path}" fill="none" style="stroke:${opts.c}" stroke-width="2.5" stroke-linejoin="round"/>`;
+
+  // dots + bottom labels
+  svg += points.map((p, i) => `
+    <circle cx="${X(i)}" cy="${Y(p.y)}" r="4" style="fill:${opts.c}"/>
+    <text x="${X(i)}" y="${H - 8}" text-anchor="middle" font-size="10" style="fill:var(--muted)">${p.x}</text>`
+  ).join("");
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">${svg}</svg>`;
+}
+
+/* ---- Planned vs actual bars (one pair of bars per day) ----------------
+   A "*" and a faded bar mean not all lines worked that day.            */
+function plannedVsActualBars(days) {
+  const W = 480, H = 210;
+  const pad = { l: 40, r: 8, t: 10, b: 26 };
+  const innerW = W - pad.l - pad.r;
+  const innerH = H - pad.t - pad.b;
+
+  const max = Math.max(...days.map(d => Math.max(d.planned, d.actual)), 1);
+  const Y = v => pad.t + innerH - innerH * v / max;
+  const slot = innerW / days.length;           // width given to each day
+
+  let svg = "";
+
+  // grid lines + left-side numbers
+  for (let i = 0; i <= 3; i++) {
+    const v = max * i / 3;
+    svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${Y(v)}" y2="${Y(v)}" style="stroke:var(--line)"/>
+            <text x="${pad.l - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="10" style="fill:var(--muted)">${Math.round(v)}</text>`;
+  }
+
+  // bars
+  days.forEach((d, i) => {
+    const x = pad.l + i * slot;
+    const barW = slot * 0.34;
+    const partialDay = d.lines < TOTAL_LINES;
+    const baseline = pad.t + innerH;
+
+    svg += `
+      <rect x="${x + slot * 0.12}" y="${Y(d.planned)}" width="${barW}" height="${baseline - Y(d.planned)}"
+            rx="3" style="fill:var(--line)"/>
+      <rect x="${x + slot * 0.12 + barW + 2}" y="${Y(d.actual)}" width="${barW}" height="${baseline - Y(d.actual)}"
+            rx="3" style="fill:var(--blue);opacity:${partialDay ? 0.4 : 1}"/>
+      <text x="${x + slot / 2}" y="${H - 9}" text-anchor="middle" font-size="10"
+            style="fill:var(--muted)">${d.date}${partialDay ? "*" : ""}</text>`;
+  });
+
+  return `<div class="scroll"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:380px" role="img">${svg}</svg></div>`;
+}
+
+/* ---- "Pieces missing over time" mini chart ---------------------------- */
+function shortfallTrend(history) {
+  if (history.length < 2) {
+    return `<div class="sub">Needs 2+ daily reports. Run run_all.py each day and this fills in.</div>`;
+  }
+  const points = history.map(h => ({ x: h.date.slice(5), y: h.shortfall }));
+  return lineChart(points, { c: "var(--red)", f: v => fmt(Math.round(v)) });
+}
+
+
+/* =====================================================================
+   D. ONE ORDER  (everything shown for a single order)
+   ===================================================================== */
+
+/* ---- "What to do today" steps ---- */
+function buildActions(o, bestFix, readyPieces) {
+  const steps = [];
+
+  // one step per late/at-risk material
+  o.material_problems.forEach(m => steps.push(
+    `<b>Call ${esc(m.supplier)}</b> about ${esc(m.item)}: ${fmt(m.balance)} ${esc(m.unit)} still missing. Ask for a part-shipment today.`
+  ));
+
+  if (o.shortfall > 0) {
+    steps.push(bestFix
+      ? `<b>Decide today:</b> “${bestFix[0]}” can close the gap. Check cost and staff consent first.`
+      : `<b>No single option closes the gap.</b> Combine overtime and Friday work, and talk to the buyer.`);
+
+    steps.push(`<b>Warn the buyer early</b> about a partial shipment (about ${fmt(readyPieces)} pcs on time, the rest later).`);
+  }
+
+  if (!steps.length) steps.push("<b>No action needed.</b> Keep monitoring daily.");
+  return steps;
+}
+
+/* ---- Materials table ---- */
+function materialsTable(o) {
+  if (!o.material_problems.length) return `<div class="sub">No material problems 🎉</div>`;
+
+  const rows = o.material_problems.map(m => `
+    <tr>
+      <td>${esc(m.item)}</td>
+      <td>${esc(m.supplier)}</td>
+      <td><span class="tag ${m.status == "LATE" ? "red" : "amber"}">${m.status}</span></td>
+      <td>${fmt(m.balance)} ${esc(m.unit)}</td>
+      <td>${esc(m.note)}</td>
+    </tr>`).join("");
+
+  return `<div class="scroll"><table>
+    <tr><th>Item</th><th>Supplier</th><th>Status</th><th>Still missing</th><th>Note</th></tr>
+    ${rows}
+  </table></div>`;
+}
+
+/* ---- A row of "name value" bars ---- */
+function barRow(name, widthPct, color, valueText) {
+  return `<div class="row">
+    <span class="n">${name}</span>
+    <span class="t"><i style="width:${widthPct}%;background:${color}"></i></span>
+    <span class="v">${valueText}</span>
+  </div>`;
+}
+
+/* ---- Build the whole block for one order ---- */
+function renderOrder(o) {
+  const [riskClass, riskLabel, riskEmoji] = riskInfo(o.ship_risk);
+  const days    = D.series[o.order];            // daily totals for this order
+  const lineEff = D.lineEff[o.order] || {};     // efficiency per sewing line
+  const q       = o.quality;
+  const options = o.options_remaining_shortfall;
+
+  // --- numbers used by several cards ---
+  const fullDays = days.filter(d => d.lines >= TOTAL_LINES);
+  const effPoints = fullDays.map(d => ({ x: d.date, y: Math.round(d.actual / d.planned * 1000) / 10 }));
+  const dhuPoints = days.map(d => ({ x: d.date, y: Math.round(d.defects / d.actual * 1000) / 10 }));
+  const avgEff = effPoints.length
+    ? Math.round(effPoints.reduce((sum, p) => sum + p.y, 0) / effPoints.length)
+    : 0;
+
+  // pieces still missing after each recovery option
+  const recovery = {
+    "Do nothing":         o.shortfall,
+    "2 hrs overtime/day": options["2h_overtime_per_day"],
+    "Work Friday":        options.work_friday,
+    "Friday + 2 hrs OT":  options.friday_plus_2h_overtime,
+    "Friday + 3 hrs OT":  options.friday_plus_3h_overtime,
+  };
+  // first real option (not "Do nothing") that brings the shortfall to 0
+  const bestFix = Object.entries(recovery).find(([name, left], i) => i > 0 && left === 0);
+
+  // loss reasons, biggest first
+  const losses = Object.entries(o.main_loss_reasons_pieces)
+    .filter(e => e[1] > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const lossTotal = losses.reduce((sum, e) => sum + e[1], 0);
+
+  const slowestLine = Object.entries(lineEff).sort((a, b) => a[1] - b[1])[0];
+  const readyPieces = Math.min(o.projected_ready, o.order_qty);
+  const missingPieces = Math.max(0, o.order_qty - o.projected_ready);
+
+  const actions = buildActions(o, bestFix, readyPieces);
+
+  // --- small HTML pieces ---
+  const actionsHtml = actions
+    .map((a, i) => `<li><span class="num">${i + 1}</span><span>${a}</span></li>`)
+    .join("");
+
+  const lineEffHtml = Object.entries(lineEff)
+    .map(([line, v]) => barRow(esc(line), Math.min(v, 100), effColor(v), v + "%"))
+    .join("");
+
+  const recoveryHtml = Object.entries(recovery)
+    .map(([name, left]) => barRow(
+      name,
+      o.shortfall ? left / o.shortfall * 100 : 0,
+      left == 0 ? "var(--green)" : "var(--amber)",
+      fmt(left)))
+    .join("");
+
+  const progressDonut = donut([
+    { l: "Made so far",         v: o.produced,                           c: "var(--blue)" },
+    { l: "Expected to be made", v: Math.max(0, readyPieces - o.produced), c: "var(--teal)" },
+    { l: "Likely missing",      v: missingPieces,                        c: "var(--red)"  },
+  ], Math.round(readyPieces / o.order_qty * 100) + "%", "ready");
+
+  const lossDonut = donut(
+    losses.map((e, i) => ({ l: niceName(e[0]), v: e[1], c: PALETTE[i % PALETTE.length] })),
+    fmt(lossTotal), "pcs lost");
+
+  // --- the page block ---
+  return `
+<div class="sec">${esc(o.order)} · ${esc(o.style)}</div>
+
+<!-- Will it ship on time? -->
+<div class="card hero ${riskClass}">
+  <div>
+    <div class="lbl">Will it ship on time?</div>
+    <div class="big">${riskEmoji} Risk: ${riskLabel}</div>
+    <div class="sub">Ship date ${o.ship_date} · sewing must finish ${o.sewing_deadline}</div>
+  </div>
+  <div style="text-align:right">
+    <div class="lbl">Pieces likely missing</div>
+    <div class="big">${fmt(o.shortfall)}</div>
+  </div>
+</div>
+
+<!-- Four key numbers -->
+<div class="kpis">
+  <div class="card kpi">
+    <div class="ic">✅</div><div class="lbl">Made so far</div>
+    <div class="big">${fmt(o.produced)}</div>
+    <div class="sub">of ${fmt(o.order_qty)} ordered</div>
+  </div>
+  <div class="card kpi">
+    <div class="ic">⚡</div><div class="lbl">Per day: needed vs running</div>
+    <div class="big">${o.needed_per_day} / ${o.current_per_day}</div>
+    <div class="sub">running at ${o.efficiency_pct}% of plan</div>
+  </div>
+  <div class="card kpi">
+    <div class="ic">🎯</div><div class="lbl">Defects per 100 pcs (DHU)</div>
+    <div class="big">${q.recent_dhu}</div>
+    <div class="sub">target ${q.target_dhu} · ~${q.expected_defects_in_remaining} to repair</div>
+  </div>
+  <div class="card kpi">
+    <div class="ic">📦</div><div class="lbl">Material alerts</div>
+    <div class="big">${o.material_problems.length}</div>
+    <div class="sub">${fmt(o.pieces_lost_waiting_material)} pcs lost waiting</div>
+  </div>
+</div>
+
+<!-- Progress + actions -->
+<div class="g2">
+  <div class="card">
+    <h2>Order progress</h2>
+    <div class="sub">How much of the order will be ready by the sewing deadline</div>
+    ${progressDonut}
+    <div class="tip">💡 Blue and teal are good. Red is the part that may miss the ship date.</div>
+  </div>
+  <div class="card">
+    <h2>✅ What to do today</h2>
+    <div class="sub">Plain steps from the 4 agents. The manager decides.</div>
+    <ul class="acts">${actionsHtml}</ul>
+  </div>
+</div>
+
+<!-- Output + efficiency -->
+<div class="g2">
+  <div class="card">
+    <h2>Daily output: plan vs actual</h2>
+    <div class="leg">
+      <span><b style="background:var(--line)"></b>Planned</span>
+      <span><b style="background:var(--blue)"></b>Actual</span>
+      <span>* partial day</span>
+    </div>
+    ${plannedVsActualBars(days)}
+    <div class="tip">💡 Blue bars shorter than grey bars mean the factory made less than planned.</div>
+  </div>
+  <div class="card">
+    <h2>Efficiency trend (% of plan)</h2>
+    <div class="sub">Full days only. Dotted line = 100% of plan.</div>
+    ${lineChart(effPoints, { c: "var(--violet)", ref: 100, rl: "plan", min: 0, max: 110, f: v => Math.round(v) + "%" })}
+    <div class="tip">💡 On average the factory made ${avgEff}% of its plan.</div>
+  </div>
+</div>
+
+<!-- Quality + lines -->
+<div class="g2">
+  <div class="card">
+    <h2>Quality trend (DHU)</h2>
+    <div class="sub">Defects per 100 pieces. Dotted line = target.</div>
+    ${lineChart(dhuPoints, { c: "var(--teal)", ref: q.target_dhu, rl: "target", min: 0, f: v => v.toFixed(1) })}
+    <div class="tip">💡 ${q.recent_dhu <= q.target_dhu
+        ? "Quality is inside the target. Keep it there."
+        : "Quality is above the target. Check the line with most defects."}</div>
+  </div>
+  <div class="card">
+    <h2>Efficiency by line</h2>
+    <div class="sub">Output ÷ plan for this order</div>
+    ${lineEffHtml}
+    <div class="tip">💡 ${slowestLine ? esc(slowestLine[0]) + " is the slowest line. Start there." : ""}</div>
+  </div>
+</div>
+
+<!-- Losses + recovery -->
+<div class="g2">
+  <div class="card">
+    <h2>Where pieces were lost</h2>
+    <div class="sub">Estimate for the last 3 full days</div>
+    ${lossDonut}
+    <div class="tip">💡 Biggest cause: ${losses[0] ? esc(niceName(losses[0][0])) : "none"}. Fix this first.</div>
+  </div>
+  <div class="card">
+    <h2>Recovery options</h2>
+    <div class="sub">Pieces still missing after each option. Green = fully fixed.</div>
+    ${recoveryHtml}
+    <div class="tip">💡 The agent does not know cost or worker consent. That is your decision.</div>
+  </div>
+</div>
+
+<!-- Materials + history -->
+<div class="g2">
+  <div class="card">
+    <h2>Materials needing attention</h2>
+    ${materialsTable(o)}
+  </div>
+  <div class="card">
+    <h2>Pieces missing over time</h2>
+    <div class="sub">Going down = recovering. Going up = getting worse.</div>
+    ${shortfallTrend(D.history[o.order])}
+  </div>
+</div>`;
+}
+
+
+/* =====================================================================
+   E. DATA HEALTH  (did the input data pass the checks?)
+   ===================================================================== */
+
+// Use the full data_check.json if present, else fall back to the small
+// summary inside facts.json (older run_all.py versions).
+function loadDataCheck() {
+  if (D.dq) return D.dq;
+
+  const old = D.latest.data_quality;
+  if (!old) return null;
+
+  return {
+    status: old.status,
+    rows: null,
+    removed: old.rows_removed,
+    issues: old.warnings.map(msg => ({ level: "WARN", msg: msg, fix: "", rows: [] })),
+    folder: D.latest.as_of,
+  };
+}
+const DQ = loadDataCheck();
+
+// status -> [css-class, emoji, title, explanation]
+const DQ_STATUS = {
+  OK:      ["green", "✅", "Data looks good",                   "Agents ran on complete, clean data."],
+  WARN:    ["amber", "⚠️", "Usable, but please check",          "Agents ran, but some numbers may be less reliable."],
+  BLOCKED: ["red",   "⛔", "Data problem: agents did not run",  "Fix the items below, then run again."],
+};
+
+function renderDataHealth() {
+  if (!DQ) {
+    return `<div class="sec">Data health</div>
+            <div class="card"><h2>🛡️ Data health</h2>
+            <div class="sub">No data check found. Update run_all.py and run it again.</div></div>`;
+  }
+
+  const [cls, icon, title, explain] = DQ_STATUS[DQ.status];
+  const rowsUsed = DQ.rows != null ? DQ.rows - DQ.removed : null;
+  const countLevel = level => DQ.issues.filter(i => i.level === level).length;
+
+  // show at most 6 issues
+  const issuesHtml = DQ.issues.slice(0, 6).map(i => `
+    <div class="dqi">
+      <span class="tag ${i.level === "WARN" ? "amber" : "red"}">${i.level}</span>
+      <div>
+        ${esc(i.msg)}
+        ${i.fix ? `<div class="sub">Fix: ${esc(i.fix)}</div>` : ""}
+        ${i.rows && i.rows.length ? `<div class="sub">Excel rows: ${i.rows.join(", ")}</div>` : ""}
+      </div>
+    </div>`).join("");
+
+  const moreHtml = DQ.issues.length > 6
+    ? `<div class="sub" style="margin-top:8px">+ ${DQ.issues.length - 6} more in data_check.md</div>`
+    : "";
+
+  const rowsDonut = rowsUsed != null
+    ? donut([
+        { l: "Rows used", v: rowsUsed,   c: "var(--green)" },
+        { l: "Left out",  v: DQ.removed, c: "var(--red)"   },
+      ], Math.round(rowsUsed / DQ.rows * 100) + "%", "rows used")
+    : "";
+
+  return `
+<div class="sec">Data health</div>
+<div class="card ${cls}" style="border-left:7px solid var(--c)">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+    <div>
+      <div class="big">${icon} ${title}</div>
+      <div class="sub">${explain} Checked: ${DQ.folder}.</div>
+      <div class="sub" style="margin-top:6px">
+        Blocking: ${countLevel("BLOCK")} · Errors (rows left out): ${countLevel("ERROR")} · Warnings: ${countLevel("WARN")}
+      </div>
+    </div>
+    ${rowsDonut}
+  </div>
+  ${issuesHtml || '<div class="dqi">No problems found 🎉</div>'}
+  ${moreHtml}
+  <div class="tip">💡 Rows with errors are left out of every chart, so one typo cannot spoil the forecast.</div>
+</div>`;
+}
+
+// One-line reminder inside the welcome banner (only when data is not fully OK)
+const dataCheckLine = () =>
+  DQ && DQ.status !== "OK"
+    ? `<p>🛡️ Data check: <strong>${DQ.status}</strong>. See “Data health” below.</p>`
+    : "";
+
+// Red banner when the NEWEST data check failed but we still show an older report
+const staleBanner = () =>
+  DQ && DQ.status === "BLOCKED" && DQ.folder > D.latest.as_of
+    ? `<div class="card hero red" style="margin:0 0 12px"><div>
+         <div class="big">⛔ Newest data check failed (${DQ.folder})</div>
+         <div class="sub">The charts below are from the last good report (${D.latest.as_of}). Do not rely on them for today.</div>
+       </div></div>`
+    : "";
+
+
+/* =====================================================================
+   F. BUILD THE PAGE
+   ===================================================================== */
+const firstOrder = D.latest.orders[0];
+const ordersNeedingAttention = D.latest.orders.filter(o => o.shortfall > 0).length;
+
+// Top bar pills
+if (DQ) document.getElementById("dqpill").textContent = "🛡️ Data: " + DQ.status;
+document.getElementById("asof").textContent = "Data as of " + D.latest.as_of;
+
+// Sentence in the welcome banner
+const plural = ordersNeedingAttention > 1;
+const welcomeSummary = ordersNeedingAttention
+  ? `<strong>${ordersNeedingAttention} order${plural ? "s" : ""} need${plural ? "" : "s"} attention today.</strong>
+     ${esc(firstOrder.order)} may be short by about ${fmt(firstOrder.shortfall)} pieces
+     (${Math.round(firstOrder.shortfall / firstOrder.order_qty * 100)}%) on ship day.`
+  : "<strong>All orders look on track today.</strong>";
+
+const welcomeHtml = `
+<div class="welcome">
+  <h1>স্বাগতম, Sir 👋</h1>
+  <p>${greeting}! Myself BunonAI & Here is your factory in one page.</p>
+  <p>${welcomeSummary}</p>
+  <div class="chips">
+    <span>🟢 on track</span><span>🟡 keep watching</span><span>🔴 act today</span><span>💡 tips under each chart</span>
+  </div>
+  ${dataCheckLine()}
+</div>`;
+
+// WhatsApp-ready message (only if brief.txt exists)
+const briefHtml = D.brief
+  ? `<div class="sec">Today’s message for the manager</div>
+     <div class="card"><div class="sub">Ready to copy into WhatsApp</div><pre id="brief"></pre></div>`
+  : "";
+
+// Put everything on the page, in order
+document.getElementById("app").innerHTML =
+    staleBanner()
+  + welcomeHtml
+  + renderDataHealth()
+  + D.latest.orders.map(renderOrder).join("")
+  + briefHtml;
+
+if (D.brief) document.getElementById("brief").textContent = D.brief;   // textContent = safe, no HTML
+document.getElementById("gen").textContent = "Report created " + D.generated;
+</script>
+</body>
+</html>"""
+
+
+def main():
+    # 1) Find every daily report. The newest one is the "latest".
+    runs = sorted(Path("reports").glob("*/facts.json"))
     if not runs:
         sys.exit("No reports yet. Run: python run_all.py")
-    return [json.loads(p.read_text(encoding="utf-8")) for p in runs], runs
+    hist = [json.loads(p.read_text(encoding="utf-8")) for p in runs]
+    latest, ldir = hist[-1], runs[-1].parent
 
+    # 2) Optional extras: data-quality check and the WhatsApp message
+    chk = sorted(Path("reports").glob("*/data_check.json"))
+    dq = json.loads(chk[-1].read_text(encoding="utf-8")) if chk else None
+    brief_file = ldir / "brief.txt"
+    brief = brief_file.read_text(encoding="utf-8") if brief_file.exists() else ""
 
-def load_brief(report_dir: Path) -> str:
-    """Return the manager's message for the latest report, if it exists."""
-    brief_file = report_dir / "brief.txt"
-    return brief_file.read_text(encoding="utf-8") if brief_file.exists() else ""
-
-
-def build_order_series(df: pd.DataFrame, latest: dict):
-    """Build daily series and per-line efficiency for each order."""
-    series, line_eff = {}, {}
-    for order in latest["orders"]:
-        order_df = df[df.order_id == order["order"]]
-
-        daily = (
-            order_df.groupby("date")
-            .agg(
-                planned=("planned_output", "sum"),
-                actual=("actual_output", "sum"),
-                defects=("defects_found", "sum"),
-                lines=("line", "nunique"),
-            )
-            .reset_index()
-        )
-        daily["date"] = daily.date.dt.strftime("%m-%d")
-        series[order["order"]] = daily.to_dict("records")
-
-        per_line = order_df.groupby("line")[["actual_output", "planned_output"]].sum()
-        line_eff[order["order"]] = (
-            (per_line.actual_output / per_line.planned_output * 100).round(1).to_dict()
-        )
-    return series, line_eff
-
-
-def build_shortfall_history(history: list[dict], latest: dict) -> dict:
-    """Track the shortfall of each order across all daily reports."""
-    return {
-        order["order"]: [
-            {"date": report["as_of"], "shortfall": item["shortfall"]}
-            for report in history
-            for item in report["orders"]
-            if item["order"] == order["order"]
-        ]
-        for order in latest["orders"]
-    }
-
-
-def render(data: dict) -> str:
-    """Inject the data into the HTML template."""
-    template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    # Escape "</" so the JSON cannot close the <script> tag early.
-    payload = json.dumps(data, ensure_ascii=False, default=_json_default).replace("</", "<\\/")
-    return template.replace(PLACEHOLDER, payload)
-
-
-def main() -> None:
-    history, runs = load_reports()
-    latest, latest_dir = history[-1], runs[-1].parent
-
-    df = pd.read_csv(DATASET_PATH, parse_dates=["date"])
+    # 3) Production CSV, cut off at the latest report date
+    df = pd.read_csv("BunonAI_daily_production_dataset.csv", parse_dates=["date"])
     df = df[df.date <= pd.Timestamp(latest["as_of"])]
 
-    series, line_eff = build_order_series(df, latest)
+    # 4) Per-order daily totals and per-line efficiency
+    series, line_eff = {}, {}
+    for o in latest["orders"]:
+        d = df[df.order_id == o["order"]]
+        g = (d.groupby("date")
+              .agg(planned=("planned_output", "sum"), actual=("actual_output", "sum"),
+                   defects=("defects_found", "sum"), lines=("line", "nunique"))
+              .reset_index())
+        g["date"] = g.date.dt.strftime("%m-%d")
+        series[o["order"]] = g.to_dict("records")
 
-    data = {
-        "latest": latest,
-        "brief": load_brief(latest_dir),
-        "series": series,
-        "lineEff": line_eff,
-        "history": build_shortfall_history(history, latest),
-        "generated": datetime.now().strftime("%d %b %Y, %H:%M"),
-        "total_lines": int(df.line.nunique()),
+        gg = d.groupby("line")[["actual_output", "planned_output"]].sum()
+        line_eff[o["order"]] = (gg.actual_output / gg.planned_output * 100).round(1).to_dict()
+
+    # 5) Shortfall history across all daily reports
+    history = {
+        o["order"]: [{"date": h["as_of"], "shortfall": x["shortfall"]}
+                     for h in hist for x in h["orders"] if x["order"] == o["order"]]
+        for o in latest["orders"]
     }
 
-    OUTPUT_PATH.write_text(render(data), encoding="utf-8")
+    # 6) Pack everything into one JSON blob and inject it into the template
+    data = dict(
+        latest=latest, dq=dq, brief=brief, series=series, lineEff=line_eff, history=history,
+        generated=datetime.now().strftime("%d %b %Y, %H:%M"),
+        total_lines=int(df.line.nunique()),
+    )
+    js = json.dumps(
+        data, ensure_ascii=False,
+        default=lambda x: x.item() if hasattr(x, "item") else str(x),
+    ).replace("</", "<\\/")          # stops "</script>" inside data from breaking the page
+
+    Path("dashboard.html").write_text(TEMPLATE.replace("__DATA__", js), encoding="utf-8")
     print("✅ dashboard.html created - double-click it to open")
 
 

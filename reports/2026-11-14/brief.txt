@@ -1,0 +1,4 @@
+⛔ BunonAI: data problem, no forecast today.
+- No data since 2026-11-10: 3 working day(s) missing (11 Nov, 12 Nov, 14 Nov).
+- On 2026-11-10 these lines have not reported: Line-2, Line-3.
+Fix the data, then run again. Details: reports\2026-11-14\data_check.md
