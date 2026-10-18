@@ -1,6 +1,8 @@
-# BunonAI
-
-**A virtual operations manager for small garment factories.**
+![thumbnail](assets/bunonai_thumbnail.png)
+<div align="center">
+  <h3>Bunon AI</h3>
+  <h5>A virtual operations manager for small garment factories.</h5>
+</div>
 
 Every evening, BunonAI reads the factory's daily production sheet, looks for delays, late materials and quality problems, and forecasts whether each export order will ship on time. It then sends the manager a short brief in Bangla and English, with recovery options and the numbers behind them.
 <img src="https://capsule-render.vercel.app/api?type=rect&color=gradient&height=2&section=footer" width="100%" alt="Footer divider"/>
